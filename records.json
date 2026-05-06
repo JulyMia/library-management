@@ -1,0 +1,16 @@
+[
+  {
+    "record_id": "R-1001",
+    "user_id": "U-1001",
+    "user_name": "小明",
+    "book_id": "B-1002",
+    "book_title": "软件工程导论",
+    "isbn": "9787301000002",
+    "borrow_date": "2026-05-01",
+    "due_date": "2026-05-31",
+    "return_date": "",
+    "returned": false,
+    "overdue_days": 0,
+    "note": "系统初始化生成的示例借阅"
+  }
+]

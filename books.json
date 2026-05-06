@@ -1,0 +1,50 @@
+[
+  {
+    "book_id": "B-1001",
+    "title": "Python 程序设计",
+    "author": "张三",
+    "isbn": "9787301000001",
+    "category": "计算机",
+    "publisher": "高教出版社",
+    "publish_year": 2021,
+    "total_count": 6,
+    "available_count": 6,
+    "description": "基础教材"
+  },
+  {
+    "book_id": "B-1002",
+    "title": "软件工程导论",
+    "author": "李四",
+    "isbn": "9787301000002",
+    "category": "软件工程",
+    "publisher": "清华大学出版社",
+    "publish_year": 2020,
+    "total_count": 5,
+    "available_count": 4,
+    "description": "课程常用书"
+  },
+  {
+    "book_id": "B-1003",
+    "title": "数据库系统概论",
+    "author": "王五",
+    "isbn": "9787301000003",
+    "category": "数据库",
+    "publisher": "人民邮电出版社",
+    "publish_year": 2022,
+    "total_count": 4,
+    "available_count": 4,
+    "description": "数据库基础"
+  },
+  {
+    "book_id": "B-1004",
+    "title": "设计模式",
+    "author": "GoF",
+    "isbn": "9787301000004",
+    "category": "软件设计",
+    "publisher": "机械工业出版社",
+    "publish_year": 2019,
+    "total_count": 3,
+    "available_count": 3,
+    "description": "经典书籍"
+  }
+]

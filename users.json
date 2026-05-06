@@ -1,0 +1,32 @@
+[
+  {
+    "user_id": "U-1001",
+    "name": "小明",
+    "phone": "13800000001",
+    "email": "xiaoming@example.com",
+    "user_type": "普通用户",
+    "department": "计算机学院",
+    "register_date": "2026-05-06",
+    "status": "正常"
+  },
+  {
+    "user_id": "U-1002",
+    "name": "王老师",
+    "phone": "13800000002",
+    "email": "teacher@example.com",
+    "user_type": "教师用户",
+    "department": "软件学院",
+    "register_date": "2026-05-06",
+    "status": "正常"
+  },
+  {
+    "user_id": "U-1003",
+    "name": "管理员",
+    "phone": "13800000003",
+    "email": "admin@example.com",
+    "user_type": "管理员",
+    "department": "图书馆",
+    "register_date": "2026-05-06",
+    "status": "正常"
+  }
+]
