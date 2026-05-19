@@ -99,6 +99,112 @@ class LibraryService:
         )
         return record, due_date
 
+    def _get_book_or_error(self, book_id: str) -> tuple[Book | None, str | None]:
+        book = self._find_book_obj(book_id)
+        if book is None:
+            return None, "未找到图书。"
+        return book, None
+
+    def _get_user_or_error(self, user_id: str) -> tuple[User | None, str | None]:
+        user = self._find_user_obj(user_id)
+        if user is None:
+            return None, "未找到用户。"
+        return user, None
+
+    def _get_record_or_error(
+        self,
+        record_id: str,
+    ) -> tuple[BorrowRecord | None, str | None]:
+        record = self._find_record_obj(record_id)
+        if record is None:
+            return None, "借阅记录不存在。"
+        return record, None
+
+    def _can_delete_book(self, book_id: str) -> bool:
+        return not any(
+            record.book_id == book_id and not record.returned for record in self.records
+        )
+
+    def _can_delete_user(self, user_id: str) -> bool:
+        return not any(
+            record.user_id == user_id and not record.returned for record in self.records
+        )
+
+    def _validate_user_for_borrow(self, user: User) -> tuple[bool, str]:
+        if user.status != "正常":
+            return False, "用户状态异常，不能借书。"
+        if self._get_active_borrow_count(user.user_id) >= 10:
+            return False, "该用户当前借阅数量已达上限。"
+        return True, ""
+
+    def _validate_book_for_borrow(self, book: Book) -> tuple[bool, str]:
+        if book.available_count <= 0:
+            return False, "图书库存不足。"
+        return True, ""
+
+    def _validate_borrow_request(self, user: User, book: Book) -> tuple[bool, str]:
+        is_valid, message = self._validate_user_for_borrow(user)
+        if not is_valid:
+            return False, message
+        is_valid, message = self._validate_book_for_borrow(book)
+        if not is_valid:
+            return False, message
+        if self._has_active_borrow(user.user_id, book.book_id):
+            return False, "该用户已经借阅过这本书且尚未归还。"
+        return True, ""
+
+    def _apply_book_updates(self, book: Book, info: dict[str, Any]) -> tuple[bool, str]:
+        if "title" in info and str(info["title"]).strip():
+            book.title = str(info["title"]).strip()
+        if "author" in info and str(info["author"]).strip():
+            book.author = str(info["author"]).strip()
+        if "isbn" in info and str(info["isbn"]).strip():
+            new_isbn = str(info["isbn"]).strip()
+            if self._book_exists(new_isbn, exclude_book_id=book.book_id):
+                return False, "ISBN 与其他图书重复。"
+            book.isbn = new_isbn
+        if "category" in info:
+            book.category = str(info["category"]).strip()
+        if "publisher" in info:
+            book.publisher = str(info["publisher"]).strip()
+        if "publish_year" in info and str(info["publish_year"]).strip():
+            book.publish_year = int(info["publish_year"])
+        if "description" in info:
+            book.description = str(info["description"]).strip()
+        if "total_count" in info and str(info["total_count"]).strip():
+            total = int(info["total_count"])
+            diff = total - book.total_count
+            book.total_count = total
+            book.available_count = self._normalize_available_count(
+                book.available_count + diff,
+                book.total_count,
+            )
+        if "available_count" in info and str(info["available_count"]).strip():
+            requested_count = int(info["available_count"])
+            book.available_count = self._normalize_available_count(
+                requested_count,
+                book.total_count,
+            )
+        return True, ""
+
+    def _apply_user_updates(self, user: User, info: dict[str, Any]) -> tuple[bool, str]:
+        if "name" in info and str(info["name"]).strip():
+            user.name = str(info["name"]).strip()
+        if "phone" in info and str(info["phone"]).strip():
+            phone = str(info["phone"]).strip()
+            if self._phone_exists(phone, exclude_user_id=user.user_id):
+                return False, "手机号与其他用户重复。"
+            user.phone = phone
+        if "email" in info:
+            user.email = str(info["email"]).strip()
+        if "user_type" in info and str(info["user_type"]).strip():
+            user.user_type = str(info["user_type"]).strip()
+        if "department" in info:
+            user.department = str(info["department"]).strip()
+        if "status" in info and str(info["status"]).strip():
+            user.status = str(info["status"]).strip()
+        return True, ""
+
     def add_book(self, info: dict[str, Any]) -> tuple[bool, str]:
         book_id = info.get("book_id") or self._make_id("B")
         title = str(info.get("title", "")).strip()
@@ -132,52 +238,24 @@ class LibraryService:
         return True, f"图书添加成功，编号为 {new_book.book_id}。"
 
     def delete_book(self, book_id: str) -> tuple[bool, str]:
-        book_to_delete = self._find_book_obj(book_id)
-        if book_to_delete is None:
-            return False, "未找到图书。"
-        if any(record.book_id == book_id and not record.returned for record in self.records):
+        book_to_delete, error_message = self._get_book_or_error(book_id)
+        if error_message:
+            return False, error_message
+        if not self._can_delete_book(book_id):
             return False, "该图书存在未归还记录，不能删除。"
+        assert book_to_delete is not None
         self.books.remove(book_to_delete)
         self._save_books()
         return True, "图书删除成功。"
 
     def update_book(self, book_id: str, info: dict[str, Any]) -> tuple[bool, str]:
-        book_to_update = self._find_book_obj(book_id)
-        if book_to_update is None:
-            return False, "未找到图书。"
-
-        if "title" in info and str(info["title"]).strip():
-            book_to_update.title = str(info["title"]).strip()
-        if "author" in info and str(info["author"]).strip():
-            book_to_update.author = str(info["author"]).strip()
-        if "isbn" in info and str(info["isbn"]).strip():
-            new_isbn = str(info["isbn"]).strip()
-            if self._book_exists(new_isbn, exclude_book_id=book_id):
-                return False, "ISBN 与其他图书重复。"
-            book_to_update.isbn = new_isbn
-        if "category" in info:
-            book_to_update.category = str(info["category"]).strip()
-        if "publisher" in info:
-            book_to_update.publisher = str(info["publisher"]).strip()
-        if "publish_year" in info and str(info["publish_year"]).strip():
-            book_to_update.publish_year = int(info["publish_year"])
-        if "description" in info:
-            book_to_update.description = str(info["description"]).strip()
-        if "total_count" in info and str(info["total_count"]).strip():
-            total = int(info["total_count"])
-            diff = total - book_to_update.total_count
-            book_to_update.total_count = total
-            book_to_update.available_count = self._normalize_available_count(
-                book_to_update.available_count + diff,
-                book_to_update.total_count,
-            )
-        if "available_count" in info and str(info["available_count"]).strip():
-            requested_count = int(info["available_count"])
-            book_to_update.available_count = self._normalize_available_count(
-                requested_count,
-                book_to_update.total_count,
-            )
-
+        book_to_update, error_message = self._get_book_or_error(book_id)
+        if error_message:
+            return False, error_message
+        assert book_to_update is not None
+        is_updated, message = self._apply_book_updates(book_to_update, info)
+        if not is_updated:
+            return False, message
         self._save_books()
         return True, "图书信息修改成功。"
 
@@ -234,36 +312,24 @@ class LibraryService:
         return True, f"用户添加成功，编号为 {new_user.user_id}。"
 
     def delete_user(self, user_id: str) -> tuple[bool, str]:
-        user_to_delete = self._find_user_obj(user_id)
-        if user_to_delete is None:
-            return False, "未找到用户。"
-        if any(record.user_id == user_id and not record.returned for record in self.records):
+        user_to_delete, error_message = self._get_user_or_error(user_id)
+        if error_message:
+            return False, error_message
+        if not self._can_delete_user(user_id):
             return False, "该用户存在未归还图书，不能删除。"
+        assert user_to_delete is not None
         self.users.remove(user_to_delete)
         self._save_users()
         return True, "用户删除成功。"
 
     def update_user(self, user_id: str, info: dict[str, Any]) -> tuple[bool, str]:
-        user_to_update = self._find_user_obj(user_id)
-        if user_to_update is None:
-            return False, "未找到用户。"
-
-        if "name" in info and str(info["name"]).strip():
-            user_to_update.name = str(info["name"]).strip()
-        if "phone" in info and str(info["phone"]).strip():
-            phone = str(info["phone"]).strip()
-            if self._phone_exists(phone, exclude_user_id=user_id):
-                return False, "手机号与其他用户重复。"
-            user_to_update.phone = phone
-        if "email" in info:
-            user_to_update.email = str(info["email"]).strip()
-        if "user_type" in info and str(info["user_type"]).strip():
-            user_to_update.user_type = str(info["user_type"]).strip()
-        if "department" in info:
-            user_to_update.department = str(info["department"]).strip()
-        if "status" in info and str(info["status"]).strip():
-            user_to_update.status = str(info["status"]).strip()
-
+        user_to_update, error_message = self._get_user_or_error(user_id)
+        if error_message:
+            return False, error_message
+        assert user_to_update is not None
+        is_updated, message = self._apply_user_updates(user_to_update, info)
+        if not is_updated:
+            return False, message
         self._save_users()
         return True, "用户信息修改成功。"
 
@@ -290,20 +356,12 @@ class LibraryService:
         user = self._find_user_obj(user_id)
         if user is None:
             return False, "用户不存在。"
-        if user.status != "正常":
-            return False, "用户状态异常，不能借书。"
-
         book = self._find_book_obj(book_id)
         if book is None:
             return False, "图书不存在。"
-        if book.available_count <= 0:
-            return False, "图书库存不足。"
-
-        if self._get_active_borrow_count(user_id) >= 10:
-            return False, "该用户当前借阅数量已达上限。"
-        if self._has_active_borrow(user_id, book_id):
-            return False, "该用户已经借阅过这本书且尚未归还。"
-
+        is_valid, message = self._validate_borrow_request(user, book)
+        if not is_valid:
+            return False, message
         record, due_date = self._create_borrow_record(user, book, note)
         book.available_count -= 1
         self.records.append(record)
@@ -311,16 +369,17 @@ class LibraryService:
         return True, f"借书成功，应还日期为 {due_date}。"
 
     def return_book(self, record_id: str) -> tuple[bool, str]:
-        record_to_return = self._find_record_obj(record_id)
-        if record_to_return is None:
-            return False, "借阅记录不存在。"
+        record_to_return, error_message = self._get_record_or_error(record_id)
+        if error_message:
+            return False, error_message
         if record_to_return.returned:
             return False, "该记录已归还。"
 
-        book = self._find_book_obj(record_to_return.book_id)
-        if book is None:
+        book, error_message = self._get_book_or_error(record_to_return.book_id)
+        if error_message:
             return False, "图书记录异常，图书已不存在。"
-
+        assert record_to_return is not None
+        assert book is not None
         record_to_return.returned = True
         record_to_return.return_date = now_date_text()
         record_to_return.overdue_days = record_to_return.calculate_overdue_days()
@@ -424,13 +483,13 @@ class LibraryService:
         items: list[BorrowRecord] | None = None,
     ) -> list[dict[str, Any]]:
         data = items if items is not None else self.records
-        result = []
+        record_dicts = []
         for item in data:
-            temp = item.to_dict()
+            record_data = item.to_dict()
             if not item.returned:
-                temp["overdue_days"] = item.calculate_overdue_days()
-            result.append(temp)
-        return result
+                record_data["overdue_days"] = item.calculate_overdue_days()
+            record_dicts.append(record_data)
+        return record_dicts
 
     def add_sample_data_if_empty(self) -> tuple[bool, str]:
         if self.books or self.users or self.records:
