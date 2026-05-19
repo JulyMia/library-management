@@ -1,3 +1,5 @@
+"""命令行界面层，负责菜单分发与用户交互。"""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -18,6 +20,8 @@ from utils import (
 
 
 class LibraryCLI:
+    """封装图书馆管理系统的命令行交互流程。"""
+
     def __init__(self) -> None:
         self.service = LibraryService()
 
@@ -28,6 +32,7 @@ class LibraryCLI:
         handlers: dict[str, Callable[[], None]],
         exit_choice: str,
     ) -> None:
+        """运行通用菜单循环并按编号分发处理函数。"""
         while True:
             show_menu(title, options)
             choice = input("请选择功能编号: ").strip()
@@ -41,20 +46,25 @@ class LibraryCLI:
             handler()
 
     def _pause_with_message(self, message: str) -> None:
+        """输出消息并暂停，便于用户查看结果。"""
         print(message)
         pause()
 
     def _show_books(self) -> None:
+        """显示当前全部图书列表。"""
         print_book_rows(self.service.export_books_as_dicts())
 
     def _show_users(self) -> None:
+        """显示当前全部用户列表。"""
         print_user_rows(self.service.export_users_as_dicts())
 
     def _show_unreturned_records(self) -> None:
+        """显示所有未归还借阅记录。"""
         data = self.service.get_unreturned_records()
         print_record_rows(self.service.export_records_as_dicts(data))
 
     def _collect_book_info(self) -> dict[str, object]:
+        """采集新增图书所需的输入字段。"""
         book_info = {
             "title": input_text("书名: "),
             "author": input_text("作者: "),
@@ -69,6 +79,7 @@ class LibraryCLI:
         return book_info
 
     def _collect_book_update_info(self) -> dict[str, str]:
+        """采集更新图书时允许修改的字段。"""
         updated_info: dict[str, str] = {}
         print("直接回车表示该字段不修改。")
         field_prompts = {
@@ -90,6 +101,7 @@ class LibraryCLI:
         return updated_info
 
     def _collect_user_info(self) -> dict[str, str]:
+        """采集新增用户所需的输入字段。"""
         print("用户类型可输入: 普通用户 / 教师用户 / 管理员")
         return {
             "name": input_text("姓名: "),
@@ -101,6 +113,7 @@ class LibraryCLI:
         }
 
     def _collect_user_update_info(self) -> dict[str, str]:
+        """采集更新用户时允许修改的字段。"""
         updated_info: dict[str, str] = {}
         print("直接回车表示不修改该项。")
         field_prompts = {
@@ -119,10 +132,12 @@ class LibraryCLI:
         return updated_info
 
     def _handle_add_book(self) -> None:
+        """处理新增图书操作。"""
         _, message = self.service.add_book(self._collect_book_info())
         self._pause_with_message(message)
 
     def _handle_delete_book(self) -> None:
+        """处理删除图书操作。"""
         self._show_books()
         book_id = input_text("请输入要删除的图书编号: ")
         if confirm():
@@ -133,20 +148,24 @@ class LibraryCLI:
         pause()
 
     def _handle_update_book(self) -> None:
+        """处理修改图书操作。"""
         self._show_books()
         book_id = input_text("请输入要修改的图书编号: ")
         _, message = self.service.update_book(book_id, self._collect_book_update_info())
         self._pause_with_message(message)
 
     def _handle_show_books(self) -> None:
+        """处理显示图书列表操作。"""
         self._show_books()
         pause()
 
     def _handle_add_user(self) -> None:
+        """处理新增用户操作。"""
         _, message = self.service.add_user(self._collect_user_info())
         self._pause_with_message(message)
 
     def _handle_delete_user(self) -> None:
+        """处理删除用户操作。"""
         self._show_users()
         user_id = input_text("请输入要删除的用户编号: ")
         if confirm():
@@ -157,22 +176,26 @@ class LibraryCLI:
         pause()
 
     def _handle_update_user(self) -> None:
+        """处理修改用户操作。"""
         self._show_users()
         user_id = input_text("请输入要修改的用户编号: ")
         _, message = self.service.update_user(user_id, self._collect_user_update_info())
         self._pause_with_message(message)
 
     def _handle_search_user(self) -> None:
+        """处理查询用户操作。"""
         keyword = input_text("请输入姓名、编号、电话、邮箱或类型关键词: ")
         data = self.service.search_users(keyword)
         print_user_rows(self.service.export_users_as_dicts(data))
         pause()
 
     def _handle_show_users(self) -> None:
+        """处理显示用户列表操作。"""
         self._show_users()
         pause()
 
     def _handle_borrow_book(self) -> None:
+        """处理借书操作。"""
         print_title("当前用户列表")
         self._show_users()
         print_title("当前图书列表")
@@ -185,12 +208,14 @@ class LibraryCLI:
         pause()
 
     def _handle_return_book(self) -> None:
+        """处理还书操作。"""
         self._show_unreturned_records()
         record_id = input_text("请输入要归还的记录号: ")
         _, message = self.service.return_book(record_id)
         self._pause_with_message(message)
 
     def _handle_user_records(self) -> None:
+        """处理指定用户借阅记录查询。"""
         self._show_users()
         user_id = input_text("请输入用户编号: ")
         data = self.service.get_user_records(user_id)
@@ -201,15 +226,18 @@ class LibraryCLI:
         pause()
 
     def _handle_show_unreturned_records(self) -> None:
+        """处理显示未归还记录操作。"""
         self._show_unreturned_records()
         pause()
 
     def _handle_set_borrow_days(self) -> None:
+        """处理默认借阅天数设置。"""
         days = input_int("请输入默认借阅天数: ", default=30, minimum=1)
         _, message = self.service.set_default_borrow_days(days)
         self._pause_with_message(message)
 
     def _handle_show_overdue_records(self) -> None:
+        """处理逾期记录展示。"""
         data = self.service.get_overdue_records()
         if not data:
             print("当前没有逾期记录。")
@@ -225,12 +253,14 @@ class LibraryCLI:
         pause()
 
     def _handle_show_overdue_help(self) -> None:
+        """显示逾期规则说明。"""
         print("系统默认借阅天数可在借阅管理菜单中设置。")
         print("逾期判断方式较简单: 当前日期或归还日期晚于到期日期即视为逾期。")
         print("该版本未实现罚款规则、节假日顺延等复杂业务。")
         pause()
 
     def run(self) -> None:
+        """运行系统主菜单。"""
         main_handlers = {
             "1": self.book_menu,
             "2": self.user_menu,
@@ -264,6 +294,7 @@ class LibraryCLI:
             handler()
 
     def book_menu(self) -> None:
+        """运行图书管理子菜单。"""
         self._run_menu_loop(
             "图书管理",
             [
@@ -285,6 +316,7 @@ class LibraryCLI:
         )
 
     def search_books_menu(self) -> None:
+        """运行图书查询子菜单。"""
         show_menu(
             "查询图书",
             [
@@ -308,6 +340,7 @@ class LibraryCLI:
         pause()
 
     def user_menu(self) -> None:
+        """运行用户管理子菜单。"""
         self._run_menu_loop(
             "用户管理",
             [
@@ -329,6 +362,7 @@ class LibraryCLI:
         )
 
     def borrow_menu(self) -> None:
+        """运行借阅管理子菜单。"""
         self._run_menu_loop(
             "借阅管理",
             [
@@ -350,6 +384,7 @@ class LibraryCLI:
         )
 
     def overdue_menu(self) -> None:
+        """运行逾期管理子菜单。"""
         self._run_menu_loop(
             "逾期管理",
             [
@@ -365,6 +400,7 @@ class LibraryCLI:
         )
 
     def show_stats(self) -> None:
+        """显示系统统计信息。"""
         print_title("统计信息")
         data = self.service.get_statistics()
         for key, value in data.items():
@@ -372,8 +408,9 @@ class LibraryCLI:
         pause()
 
     def load_sample_data(self) -> None:
+        """导入样例数据。"""
         if confirm("确认导入样例数据吗？仅在空数据时有效。(y/n): "):
-            ok, msg = self.service.add_sample_data_if_empty()
+            _, msg = self.service.add_sample_data_if_empty()
             print(msg)
         else:
             print("已取消。")
@@ -381,6 +418,7 @@ class LibraryCLI:
 
 
 def main() -> None:
+    """程序入口。"""
     cli = LibraryCLI()
     cli.run()
 

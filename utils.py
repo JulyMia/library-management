@@ -1,3 +1,5 @@
+"""通用输入、展示和日期处理工具函数。"""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -6,6 +8,7 @@ from models import DATE_FORMAT
 
 
 def input_text(prompt: str, allow_empty: bool = False, default: str = "") -> str:
+    """读取一段文本输入，并按需限制为空。"""
     while True:
         value = input(prompt).strip()
         if value:
@@ -16,6 +19,7 @@ def input_text(prompt: str, allow_empty: bool = False, default: str = "") -> str
 
 
 def input_int(prompt: str, default: int | None = None, minimum: int | None = None) -> int:
+    """读取整数输入，并校验默认值与最小值。"""
     while True:
         text = input(prompt).strip()
         try:
@@ -30,10 +34,12 @@ def input_int(prompt: str, default: int | None = None, minimum: int | None = Non
 
 
 def now_date_text() -> str:
+    """返回当前日期字符串。"""
     return datetime.now().strftime(DATE_FORMAT)
 
 
 def calc_due_date(start_date: str, days: int) -> str:
+    """根据起始日期和天数计算到期日期。"""
     try:
         value = datetime.strptime(start_date, DATE_FORMAT)
     except ValueError:
@@ -42,24 +48,29 @@ def calc_due_date(start_date: str, days: int) -> str:
 
 
 def pause() -> None:
+    """暂停等待用户按回车继续。"""
     input("\n按回车键继续...")
 
 
 def print_line(char: str = "-", width: int = 70) -> None:
+    """输出指定宽度的分隔线。"""
     print(char * width)
 
 
 def print_title(title: str) -> None:
+    """输出带分隔线的标题。"""
     print_line("=")
     print(title.center(70))
     print_line("=")
 
 
 def safe_lower(text: str) -> str:
+    """返回去空格并转为小写后的文本。"""
     return (text or "").strip().lower()
 
 
 def show_simple_table(rows: list[list[str]], headers: list[str]) -> None:
+    """以纯文本表格形式显示二维数据。"""
     if not rows:
         print("没有数据。")
         return
@@ -77,10 +88,12 @@ def show_simple_table(rows: list[list[str]], headers: list[str]) -> None:
 
 
 def confirm(prompt: str = "确认执行该操作吗？(y/n): ") -> bool:
+    """读取确认输入并返回布尔结果。"""
     return input(prompt).strip().lower() in {"y", "yes", "1"}
 
 
 def print_book_rows(data: list[dict]) -> None:
+    """输出图书列表表格。"""
     rows = [
         [
             item.get("book_id", ""),
@@ -95,6 +108,7 @@ def print_book_rows(data: list[dict]) -> None:
 
 
 def print_user_rows(data: list[dict]) -> None:
+    """输出用户列表表格。"""
     rows = [
         [
             item.get("user_id", ""),
@@ -109,6 +123,7 @@ def print_user_rows(data: list[dict]) -> None:
 
 
 def print_record_rows(data: list[dict]) -> None:
+    """输出借阅记录列表表格。"""
     rows = [
         [
             item.get("record_id", ""),
@@ -125,6 +140,7 @@ def print_record_rows(data: list[dict]) -> None:
 
 
 def show_menu(title: str, options: list[str]) -> None:
+    """输出编号菜单。"""
     print_title(title)
     for i, item in enumerate(options, start=1):
         print(f"{i}. {item}")

@@ -1,3 +1,5 @@
+"""领域模型定义，包括图书、用户和借阅记录。"""
+
 from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -7,7 +9,9 @@ DATE_FORMAT = "%Y-%m-%d"
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 @dataclass
-class Book:
+class Book:  # pylint: disable=too-many-instance-attributes
+    """图书实体。"""
+
     book_id: str
     title: str
     author: str
@@ -20,10 +24,23 @@ class Book:
     description: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        return {"book_id": self.book_id, "title": self.title, "author": self.author, "isbn": self.isbn, "category": self.category, "publisher": self.publisher, "publish_year": self.publish_year, "total_count": self.total_count, "available_count": self.available_count, "description": self.description}
+        """将图书对象转换为字典。"""
+        return {
+            "book_id": self.book_id,
+            "title": self.title,
+            "author": self.author,
+            "isbn": self.isbn,
+            "category": self.category,
+            "publisher": self.publisher,
+            "publish_year": self.publish_year,
+            "total_count": self.total_count,
+            "available_count": self.available_count,
+            "description": self.description,
+        }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Book":
+        """从字典创建图书对象。"""
         return cls(
             book_id=str(data.get("book_id", "")),
             title=str(data.get("title", "")),
@@ -38,10 +55,16 @@ class Book:
         )
 
     def short_text(self) -> str:
-        return f"[{self.book_id}] {self.title} / {self.author} / ISBN:{self.isbn} / 库存:{self.available_count}/{self.total_count}"
+        """返回用于简要展示的图书文本。"""
+        return (
+            f"[{self.book_id}] {self.title} / {self.author} / ISBN:{self.isbn} / "
+            f"库存:{self.available_count}/{self.total_count}"
+        )
 
 @dataclass
-class User:
+class User:  # pylint: disable=too-many-instance-attributes
+    """用户实体。"""
+
     user_id: str
     name: str
     phone: str
@@ -52,10 +75,21 @@ class User:
     status: str = "正常"
 
     def to_dict(self) -> dict[str, Any]:
-        return {"user_id": self.user_id, "name": self.name, "phone": self.phone, "email": self.email, "user_type": self.user_type, "department": self.department, "register_date": self.register_date, "status": self.status}
+        """将用户对象转换为字典。"""
+        return {
+            "user_id": self.user_id,
+            "name": self.name,
+            "phone": self.phone,
+            "email": self.email,
+            "user_type": self.user_type,
+            "department": self.department,
+            "register_date": self.register_date,
+            "status": self.status,
+        }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "User":
+        """从字典创建用户对象。"""
         return cls(
             user_id=str(data.get("user_id", "")),
             name=str(data.get("name", "")),
@@ -68,10 +102,16 @@ class User:
         )
 
     def short_text(self) -> str:
-        return f"[{self.user_id}] {self.name} / {self.user_type} / 电话:{self.phone} / 状态:{self.status}"
+        """返回用于简要展示的用户文本。"""
+        return (
+            f"[{self.user_id}] {self.name} / {self.user_type} / "
+            f"电话:{self.phone} / 状态:{self.status}"
+        )
 
 @dataclass
-class BorrowRecord:
+class BorrowRecord:  # pylint: disable=too-many-instance-attributes
+    """借阅记录实体。"""
+
     record_id: str
     user_id: str
     user_name: str
@@ -86,10 +126,25 @@ class BorrowRecord:
     note: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        return {"record_id": self.record_id, "user_id": self.user_id, "user_name": self.user_name, "book_id": self.book_id, "book_title": self.book_title, "isbn": self.isbn, "borrow_date": self.borrow_date, "due_date": self.due_date, "return_date": self.return_date, "returned": self.returned, "overdue_days": self.overdue_days, "note": self.note}
+        """将借阅记录对象转换为字典。"""
+        return {
+            "record_id": self.record_id,
+            "user_id": self.user_id,
+            "user_name": self.user_name,
+            "book_id": self.book_id,
+            "book_title": self.book_title,
+            "isbn": self.isbn,
+            "borrow_date": self.borrow_date,
+            "due_date": self.due_date,
+            "return_date": self.return_date,
+            "returned": self.returned,
+            "overdue_days": self.overdue_days,
+            "note": self.note,
+        }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "BorrowRecord":
+        """从字典创建借阅记录对象。"""
         return cls(
             record_id=str(data.get("record_id", "")),
             user_id=str(data.get("user_id", "")),
@@ -106,6 +161,7 @@ class BorrowRecord:
         )
 
     def is_overdue(self, now_text: str | None = None) -> bool:
+        """判断记录在给定日期下是否逾期。"""
         if self.returned:
             return self.overdue_days > 0
         if not self.due_date:
@@ -120,6 +176,7 @@ class BorrowRecord:
         return now_value.date() > due_value.date()
 
     def calculate_overdue_days(self, now_text: str | None = None) -> int:
+        """计算记录的逾期天数。"""
         if not self.due_date:
             return 0
         if self.returned and self.return_date:
@@ -135,5 +192,9 @@ class BorrowRecord:
         return days if days > 0 else 0
 
     def short_text(self) -> str:
+        """返回用于简要展示的借阅记录文本。"""
         state = "已归还" if self.returned else "未归还"
-        return f"[{self.record_id}] 用户:{self.user_name} 图书:{self.book_title} 借出:{self.borrow_date} 到期:{self.due_date} 状态:{state}"
+        return (
+            f"[{self.record_id}] 用户:{self.user_name} 图书:{self.book_title} "
+            f"借出:{self.borrow_date} 到期:{self.due_date} 状态:{state}"
+        )

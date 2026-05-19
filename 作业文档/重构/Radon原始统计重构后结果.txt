@@ -1,0 +1,72 @@
+main.py
+    LOC: 389
+    LLOC: 214
+    SLOC: 348
+    Comments: 0
+    Single comments: 0
+    Multi: 0
+    Blank: 41
+    - Comment Stats
+        (C % L): 0%
+        (C % S): 0%
+        (C + M % L): 0%
+services.py
+    LOC: 548
+    LLOC: 354
+    SLOC: 482
+    Comments: 0
+    Single comments: 0
+    Multi: 0
+    Blank: 66
+    - Comment Stats
+        (C % L): 0%
+        (C % S): 0%
+        (C + M % L): 0%
+models.py
+    LOC: 139
+    LLOC: 124
+    SLOC: 124
+    Comments: 0
+    Single comments: 0
+    Multi: 0
+    Blank: 15
+    - Comment Stats
+        (C % L): 0%
+        (C % S): 0%
+        (C + M % L): 0%
+storage.py
+    LOC: 66
+    LLOC: 48
+    SLOC: 52
+    Comments: 0
+    Single comments: 0
+    Multi: 0
+    Blank: 14
+    - Comment Stats
+        (C % L): 0%
+        (C % S): 0%
+        (C + M % L): 0%
+utils.py
+    LOC: 131
+    LLOC: 72
+    SLOC: 101
+    Comments: 0
+    Single comments: 0
+    Multi: 0
+    Blank: 30
+    - Comment Stats
+        (C % L): 0%
+        (C % S): 0%
+        (C + M % L): 0%
+sample_data.py
+    LOC: 11
+    LLOC: 8
+    SLOC: 8
+    Comments: 0
+    Single comments: 0
+    Multi: 0
+    Blank: 3
+    - Comment Stats
+        (C % L): 0%
+        (C % S): 0%
+        (C + M % L): 0%

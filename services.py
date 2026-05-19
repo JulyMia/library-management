@@ -1,3 +1,5 @@
+"""业务服务层，负责图书、用户、借阅和统计相关流程。"""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -9,16 +11,21 @@ from storage import JsonStorage
 from utils import calc_due_date, now_date_text, safe_lower
 
 
-class LibraryService:
+class LibraryService:  # pylint: disable=too-many-public-methods
+    """封装图书馆管理系统的核心业务逻辑。"""
+
     def __init__(self, storage: JsonStorage | None = None) -> None:
+        """初始化服务并加载持久化数据。"""
         self.storage = storage or JsonStorage()
         self.books, self.users, self.records = self.storage.load_all()
         self.default_borrow_days = 30
 
     def reload(self) -> None:
+        """从存储中重新加载全部数据。"""
         self.books, self.users, self.records = self.storage.load_all()
 
     def save_all(self) -> None:
+        """保存图书、用户和借阅记录。"""
         self.storage.save_all(self.books, self.users, self.records)
 
     def _make_id(self, prefix: str) -> str:
@@ -269,6 +276,7 @@ class LibraryService:
         return True, ""
 
     def add_book(self, info: dict[str, Any]) -> tuple[bool, str]:
+        """新增图书并返回执行结果。"""
         book_id = info.get("book_id") or self._make_id("B")
         title = str(info.get("title", "")).strip()
         author = str(info.get("author", "")).strip()
@@ -300,6 +308,7 @@ class LibraryService:
         return True, f"图书添加成功，编号为 {new_book.book_id}。"
 
     def delete_book(self, book_id: str) -> tuple[bool, str]:
+        """删除指定图书。"""
         book_to_delete, error_message = self._get_book_or_error(book_id)
         if error_message:
             return False, error_message
@@ -311,6 +320,7 @@ class LibraryService:
         return True, "图书删除成功。"
 
     def update_book(self, book_id: str, info: dict[str, Any]) -> tuple[bool, str]:
+        """修改指定图书信息。"""
         book_to_update, error_message = self._get_book_or_error(book_id)
         if error_message:
             return False, error_message
@@ -322,6 +332,7 @@ class LibraryService:
         return True, "图书信息修改成功。"
 
     def search_books(self, keyword: str = "", field_name: str = "all") -> list[Book]:
+        """按字段或综合条件查询图书。"""
         if not keyword:
             return list(self.books)
         normalized_keyword = safe_lower(keyword)
@@ -332,9 +343,11 @@ class LibraryService:
         ]
 
     def list_books(self) -> list[Book]:
+        """返回全部图书对象列表。"""
         return list(self.books)
 
     def add_user(self, info: dict[str, Any]) -> tuple[bool, str]:
+        """新增用户并返回执行结果。"""
         user_id = info.get("user_id") or self._make_id("U")
         name = str(info.get("name", "")).strip()
         phone = str(info.get("phone", "")).strip()
@@ -362,6 +375,7 @@ class LibraryService:
         return True, f"用户添加成功，编号为 {new_user.user_id}。"
 
     def delete_user(self, user_id: str) -> tuple[bool, str]:
+        """删除指定用户。"""
         user_to_delete, error_message = self._get_user_or_error(user_id)
         if error_message:
             return False, error_message
@@ -373,6 +387,7 @@ class LibraryService:
         return True, "用户删除成功。"
 
     def update_user(self, user_id: str, info: dict[str, Any]) -> tuple[bool, str]:
+        """修改指定用户信息。"""
         user_to_update, error_message = self._get_user_or_error(user_id)
         if error_message:
             return False, error_message
@@ -384,6 +399,7 @@ class LibraryService:
         return True, "用户信息修改成功。"
 
     def search_users(self, keyword: str = "") -> list[User]:
+        """按关键词查询用户。"""
         if not keyword:
             return list(self.users)
         normalized_keyword = safe_lower(keyword)
@@ -394,9 +410,11 @@ class LibraryService:
         ]
 
     def list_users(self) -> list[User]:
+        """返回全部用户对象列表。"""
         return list(self.users)
 
     def borrow_book(self, user_id: str, book_id: str, note: str = "") -> tuple[bool, str]:
+        """为指定用户办理借书。"""
         user = self._find_user_obj(user_id)
         if user is None:
             return False, "用户不存在。"
@@ -413,6 +431,7 @@ class LibraryService:
         return True, f"借书成功，应还日期为 {due_date}。"
 
     def return_book(self, record_id: str) -> tuple[bool, str]:
+        """为指定借阅记录办理还书。"""
         record_to_return, error_message = self._get_record_or_error(record_id)
         if error_message:
             return False, error_message
@@ -437,6 +456,7 @@ class LibraryService:
         return True, "还书成功，未逾期。"
 
     def get_user_records(self, user_id: str) -> list[BorrowRecord]:
+        """查询指定用户的全部借阅记录。"""
         return [
             self._touch_record_overdue_days(record)
             for record in self.records
@@ -444,6 +464,7 @@ class LibraryService:
         ]
 
     def get_unreturned_records(self) -> list[BorrowRecord]:
+        """查询所有未归还借阅记录。"""
         return [
             self._touch_record_overdue_days(record)
             for record in self.records
@@ -451,6 +472,7 @@ class LibraryService:
         ]
 
     def get_overdue_records(self) -> list[BorrowRecord]:
+        """查询当前逾期或归还后逾期的记录。"""
         result = []
         for item in self.records:
             self._touch_record_overdue_days(item)
@@ -460,12 +482,14 @@ class LibraryService:
         return result
 
     def set_default_borrow_days(self, days: int) -> tuple[bool, str]:
+        """设置系统默认借阅天数。"""
         if days <= 0:
             return False, "借阅天数必须大于 0。"
         self.default_borrow_days = days
         return True, f"默认借阅天数已设置为 {days} 天。"
 
     def get_statistics(self) -> dict[str, Any]:
+        """汇总系统统计信息。"""
         total_books = len(self.books)
         user_count = len(self.users)
         total_stock, available_stock = self._count_stock_statistics()
@@ -487,10 +511,12 @@ class LibraryService:
         }
 
     def export_books_as_dicts(self, items: list[Book] | None = None) -> list[dict[str, Any]]:
+        """将图书对象列表导出为字典列表。"""
         data = items if items is not None else self.books
         return [item.to_dict() for item in data]
 
     def export_users_as_dicts(self, items: list[User] | None = None) -> list[dict[str, Any]]:
+        """将用户对象列表导出为字典列表。"""
         data = items if items is not None else self.users
         return [item.to_dict() for item in data]
 
@@ -498,6 +524,7 @@ class LibraryService:
         self,
         items: list[BorrowRecord] | None = None,
     ) -> list[dict[str, Any]]:
+        """将借阅记录对象列表导出为字典列表。"""
         data = items if items is not None else self.records
         record_dicts = []
         for item in data:
@@ -508,19 +535,41 @@ class LibraryService:
         return record_dicts
 
     def add_sample_data_if_empty(self) -> tuple[bool, str]:
+        """在系统为空时导入一组样例数据。"""
         if self.books or self.users or self.records:
             return False, "当前已有数据，未重复导入样例数据。"
 
         books = [
-            Book("B-1001", "Python 程序设计", "张三", "9787301000001", "计算机", "高教出版社", 2021, 6, 6, "基础教材"),
-            Book("B-1002", "软件工程导论", "李四", "9787301000002", "软件工程", "清华大学出版社", 2020, 5, 5, "课程常用书"),
-            Book("B-1003", "数据库系统概论", "王五", "9787301000003", "数据库", "人民邮电出版社", 2022, 4, 4, "数据库基础"),
-            Book("B-1004", "设计模式", "GoF", "9787301000004", "软件设计", "机械工业出版社", 2019, 3, 3, "经典书籍"),
+            Book(
+                "B-1001", "Python 程序设计", "张三", "9787301000001",
+                "计算机", "高教出版社", 2021, 6, 6, "基础教材",
+            ),
+            Book(
+                "B-1002", "软件工程导论", "李四", "9787301000002",
+                "软件工程", "清华大学出版社", 2020, 5, 5, "课程常用书",
+            ),
+            Book(
+                "B-1003", "数据库系统概论", "王五", "9787301000003",
+                "数据库", "人民邮电出版社", 2022, 4, 4, "数据库基础",
+            ),
+            Book(
+                "B-1004", "设计模式", "GoF", "9787301000004",
+                "软件设计", "机械工业出版社", 2019, 3, 3, "经典书籍",
+            ),
         ]
         users = [
-            User("U-1001", "小明", "13800000001", "xiaoming@example.com", "普通用户", "计算机学院"),
-            User("U-1002", "王老师", "13800000002", "teacher@example.com", "教师用户", "软件学院"),
-            User("U-1003", "管理员", "13800000003", "admin@example.com", "管理员", "图书馆"),
+            User(
+                "U-1001", "小明", "13800000001", "xiaoming@example.com",
+                "普通用户", "计算机学院",
+            ),
+            User(
+                "U-1002", "王老师", "13800000002", "teacher@example.com",
+                "教师用户", "软件学院",
+            ),
+            User(
+                "U-1003", "管理员", "13800000003", "admin@example.com",
+                "管理员", "图书馆",
+            ),
         ]
         self.books.extend(books)
         self.users.extend(users)
