@@ -19,6 +19,177 @@ class LibraryCLI:
     def __init__(self) -> None:
         self.service = LibraryService()
 
+    def _pause_with_message(self, message: str) -> None:
+        print(message)
+        pause()
+
+    def _show_books(self) -> None:
+        print_book_rows(self.service.export_books_as_dicts())
+
+    def _show_users(self) -> None:
+        print_user_rows(self.service.export_users_as_dicts())
+
+    def _show_unreturned_records(self) -> None:
+        data = self.service.get_unreturned_records()
+        print_record_rows(self.service.export_records_as_dicts(data))
+
+    def _collect_book_info(self) -> dict[str, object]:
+        book_info = {
+            "title": input_text("书名: "),
+            "author": input_text("作者: "),
+            "isbn": input_text("ISBN: "),
+            "category": input_text("分类(可空): ", allow_empty=True),
+            "publisher": input_text("出版社(可空): ", allow_empty=True),
+            "publish_year": input_int("出版年份(默认0): ", default=0, minimum=0),
+            "total_count": input_int("总库存数量: ", default=1, minimum=0),
+            "description": input_text("简介(可空): ", allow_empty=True),
+        }
+        book_info["available_count"] = book_info["total_count"]
+        return book_info
+
+    def _collect_book_update_info(self) -> dict[str, str]:
+        updated_info: dict[str, str] = {}
+        print("直接回车表示该字段不修改。")
+        field_prompts = {
+            "title": "新书名: ",
+            "author": "新作者: ",
+            "isbn": "新ISBN: ",
+            "category": "新分类: ",
+            "publisher": "新出版社: ",
+            "publish_year": "新出版年份: ",
+            "total_count": "新总库存: ",
+            "available_count": "新可借库存: ",
+            "description": "新简介: ",
+        }
+        allow_empty_fields = {"category", "publisher", "description"}
+        for field_name, prompt in field_prompts.items():
+            value = input(prompt).strip()
+            if value or field_name in allow_empty_fields:
+                updated_info[field_name] = value
+        return updated_info
+
+    def _collect_user_info(self) -> dict[str, str]:
+        print("用户类型可输入: 普通用户 / 教师用户 / 管理员")
+        return {
+            "name": input_text("姓名: "),
+            "phone": input_text("电话: ", allow_empty=True),
+            "email": input_text("邮箱: ", allow_empty=True),
+            "user_type": input_text("用户类型: "),
+            "department": input_text("所属部门(可空): ", allow_empty=True),
+            "status": input_text("状态(默认正常): ", allow_empty=True, default="正常") or "正常",
+        }
+
+    def _collect_user_update_info(self) -> dict[str, str]:
+        updated_info: dict[str, str] = {}
+        print("直接回车表示不修改该项。")
+        field_prompts = {
+            "name": "新姓名: ",
+            "phone": "新电话: ",
+            "email": "新邮箱: ",
+            "user_type": "新用户类型: ",
+            "department": "新部门: ",
+            "status": "新状态: ",
+        }
+        allow_empty_fields = {"email", "department"}
+        for field_name, prompt in field_prompts.items():
+            value = input(prompt).strip()
+            if value or field_name in allow_empty_fields:
+                updated_info[field_name] = value
+        return updated_info
+
+    def _handle_add_book(self) -> None:
+        _, message = self.service.add_book(self._collect_book_info())
+        self._pause_with_message(message)
+
+    def _handle_delete_book(self) -> None:
+        self._show_books()
+        book_id = input_text("请输入要删除的图书编号: ")
+        if confirm():
+            _, message = self.service.delete_book(book_id)
+            print(message)
+        else:
+            print("已取消删除。")
+        pause()
+
+    def _handle_update_book(self) -> None:
+        self._show_books()
+        book_id = input_text("请输入要修改的图书编号: ")
+        _, message = self.service.update_book(book_id, self._collect_book_update_info())
+        self._pause_with_message(message)
+
+    def _handle_show_books(self) -> None:
+        self._show_books()
+        pause()
+
+    def _handle_add_user(self) -> None:
+        _, message = self.service.add_user(self._collect_user_info())
+        self._pause_with_message(message)
+
+    def _handle_delete_user(self) -> None:
+        self._show_users()
+        user_id = input_text("请输入要删除的用户编号: ")
+        if confirm():
+            _, message = self.service.delete_user(user_id)
+            print(message)
+        else:
+            print("已取消删除。")
+        pause()
+
+    def _handle_update_user(self) -> None:
+        self._show_users()
+        user_id = input_text("请输入要修改的用户编号: ")
+        _, message = self.service.update_user(user_id, self._collect_user_update_info())
+        self._pause_with_message(message)
+
+    def _handle_search_user(self) -> None:
+        keyword = input_text("请输入姓名、编号、电话、邮箱或类型关键词: ")
+        data = self.service.search_users(keyword)
+        print_user_rows(self.service.export_users_as_dicts(data))
+        pause()
+
+    def _handle_show_users(self) -> None:
+        self._show_users()
+        pause()
+
+    def _handle_borrow_book(self) -> None:
+        print_title("当前用户列表")
+        self._show_users()
+        print_title("当前图书列表")
+        self._show_books()
+        user_id = input_text("请输入用户编号: ")
+        book_id = input_text("请输入图书编号: ")
+        note = input_text("备注(可空): ", allow_empty=True)
+        ok, message = self.service.borrow_book(user_id, book_id, note)
+        print(message)
+        if not ok:
+            print("提示: 该版本中用户校验、库存校验、重复借阅校验都放在一个函数里，便于后续重构。")
+        pause()
+
+    def _handle_return_book(self) -> None:
+        self._show_unreturned_records()
+        record_id = input_text("请输入要归还的记录号: ")
+        _, message = self.service.return_book(record_id)
+        self._pause_with_message(message)
+
+    def _handle_user_records(self) -> None:
+        self._show_users()
+        user_id = input_text("请输入用户编号: ")
+        data = self.service.get_user_records(user_id)
+        if not data:
+            print("没有找到该用户的借阅记录。")
+        else:
+            print_record_rows(self.service.export_records_as_dicts(data))
+        pause()
+
+    def _handle_show_unreturned_records(self) -> None:
+        self._show_unreturned_records()
+        pause()
+
+    def _handle_set_borrow_days(self) -> None:
+        days = input_int("请输入默认借阅天数: ", default=30, minimum=1)
+        _, message = self.service.set_default_borrow_days(days)
+        self._pause_with_message(message)
+
     def run(self) -> None:
         while True:
             show_menu(
@@ -68,72 +239,15 @@ class LibraryCLI:
             )
             choice = input("请选择功能编号: ").strip()
             if choice == "1":
-                info = {
-                    "title": input_text("书名: "),
-                    "author": input_text("作者: "),
-                    "isbn": input_text("ISBN: "),
-                    "category": input_text("分类(可空): ", allow_empty=True),
-                    "publisher": input_text("出版社(可空): ", allow_empty=True),
-                    "publish_year": input_int("出版年份(默认0): ", default=0, minimum=0),
-                    "total_count": input_int("总库存数量: ", default=1, minimum=0),
-                    "description": input_text("简介(可空): ", allow_empty=True),
-                }
-                info["available_count"] = info["total_count"]
-                ok, msg = self.service.add_book(info)
-                print(msg)
-                pause()
+                self._handle_add_book()
             elif choice == "2":
-                data = self.service.export_books_as_dicts()
-                print_book_rows(data)
-                book_id = input_text("请输入要删除的图书编号: ")
-                if confirm():
-                    ok, msg = self.service.delete_book(book_id)
-                    print(msg)
-                else:
-                    print("已取消删除。")
-                pause()
+                self._handle_delete_book()
             elif choice == "3":
-                data = self.service.export_books_as_dicts()
-                print_book_rows(data)
-                book_id = input_text("请输入要修改的图书编号: ")
-                info = {}
-                print("直接回车表示该字段不修改。")
-                title = input("新书名: ").strip()
-                author = input("新作者: ").strip()
-                isbn = input("新ISBN: ").strip()
-                category = input("新分类: ").strip()
-                publisher = input("新出版社: ").strip()
-                publish_year = input("新出版年份: ").strip()
-                total_count = input("新总库存: ").strip()
-                available_count = input("新可借库存: ").strip()
-                description = input("新简介: ").strip()
-                if title:
-                    info["title"] = title
-                if author:
-                    info["author"] = author
-                if isbn:
-                    info["isbn"] = isbn
-                if category or category == "":
-                    info["category"] = category
-                if publisher or publisher == "":
-                    info["publisher"] = publisher
-                if publish_year:
-                    info["publish_year"] = publish_year
-                if total_count:
-                    info["total_count"] = total_count
-                if available_count:
-                    info["available_count"] = available_count
-                if description or description == "":
-                    info["description"] = description
-                ok, msg = self.service.update_book(book_id, info)
-                print(msg)
-                pause()
+                self._handle_update_book()
             elif choice == "4":
                 self.search_books_menu()
             elif choice == "5":
-                data = self.service.export_books_as_dicts()
-                print_book_rows(data)
-                pause()
+                self._handle_show_books()
             elif choice == "6":
                 break
             else:
@@ -178,64 +292,15 @@ class LibraryCLI:
             )
             choice = input("请选择功能编号: ").strip()
             if choice == "1":
-                print("用户类型可输入: 普通用户 / 教师用户 / 管理员")
-                info = {
-                    "name": input_text("姓名: "),
-                    "phone": input_text("电话: ", allow_empty=True),
-                    "email": input_text("邮箱: ", allow_empty=True),
-                    "user_type": input_text("用户类型: "),
-                    "department": input_text("所属部门(可空): ", allow_empty=True),
-                    "status": input_text("状态(默认正常): ", allow_empty=True, default="正常") or "正常",
-                }
-                ok, msg = self.service.add_user(info)
-                print(msg)
-                pause()
+                self._handle_add_user()
             elif choice == "2":
-                data = self.service.export_users_as_dicts()
-                print_user_rows(data)
-                user_id = input_text("请输入要删除的用户编号: ")
-                if confirm():
-                    ok, msg = self.service.delete_user(user_id)
-                    print(msg)
-                else:
-                    print("已取消删除。")
-                pause()
+                self._handle_delete_user()
             elif choice == "3":
-                data = self.service.export_users_as_dicts()
-                print_user_rows(data)
-                user_id = input_text("请输入要修改的用户编号: ")
-                info = {}
-                print("直接回车表示不修改该项。")
-                name = input("新姓名: ").strip()
-                phone = input("新电话: ").strip()
-                email = input("新邮箱: ").strip()
-                user_type = input("新用户类型: ").strip()
-                department = input("新部门: ").strip()
-                status = input("新状态: ").strip()
-                if name:
-                    info["name"] = name
-                if phone:
-                    info["phone"] = phone
-                if email or email == "":
-                    info["email"] = email
-                if user_type:
-                    info["user_type"] = user_type
-                if department or department == "":
-                    info["department"] = department
-                if status:
-                    info["status"] = status
-                ok, msg = self.service.update_user(user_id, info)
-                print(msg)
-                pause()
+                self._handle_update_user()
             elif choice == "4":
-                keyword = input_text("请输入姓名、编号、电话、邮箱或类型关键词: ")
-                data = self.service.search_users(keyword)
-                print_user_rows(self.service.export_users_as_dicts(data))
-                pause()
+                self._handle_search_user()
             elif choice == "5":
-                data = self.service.export_users_as_dicts()
-                print_user_rows(data)
-                pause()
+                self._handle_show_users()
             elif choice == "6":
                 break
             else:
@@ -257,43 +322,15 @@ class LibraryCLI:
             )
             choice = input("请选择功能编号: ").strip()
             if choice == "1":
-                print_title("当前用户列表")
-                print_user_rows(self.service.export_users_as_dicts())
-                print_title("当前图书列表")
-                print_book_rows(self.service.export_books_as_dicts())
-                user_id = input_text("请输入用户编号: ")
-                book_id = input_text("请输入图书编号: ")
-                note = input_text("备注(可空): ", allow_empty=True)
-                ok, msg = self.service.borrow_book(user_id, book_id, note)
-                print(msg)
-                if not ok:
-                    print("提示: 该版本中用户校验、库存校验、重复借阅校验都放在一个函数里，便于后续重构。")
-                pause()
+                self._handle_borrow_book()
             elif choice == "2":
-                data = self.service.get_unreturned_records()
-                print_record_rows(self.service.export_records_as_dicts(data))
-                record_id = input_text("请输入要归还的记录号: ")
-                ok, msg = self.service.return_book(record_id)
-                print(msg)
-                pause()
+                self._handle_return_book()
             elif choice == "3":
-                print_user_rows(self.service.export_users_as_dicts())
-                user_id = input_text("请输入用户编号: ")
-                data = self.service.get_user_records(user_id)
-                if not data:
-                    print("没有找到该用户的借阅记录。")
-                else:
-                    print_record_rows(self.service.export_records_as_dicts(data))
-                pause()
+                self._handle_user_records()
             elif choice == "4":
-                data = self.service.get_unreturned_records()
-                print_record_rows(self.service.export_records_as_dicts(data))
-                pause()
+                self._handle_show_unreturned_records()
             elif choice == "5":
-                days = input_int("请输入默认借阅天数: ", default=30, minimum=1)
-                ok, msg = self.service.set_default_borrow_days(days)
-                print(msg)
-                pause()
+                self._handle_set_borrow_days()
             elif choice == "6":
                 break
             else:
