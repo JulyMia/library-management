@@ -67,6 +67,12 @@ class LibraryService:
         self.storage.save_books(self.books)
         self.storage.save_records(self.records)
 
+    def _book_id_exists(self, book_id: str) -> bool:
+        return any(item.book_id == book_id for item in self.books)
+
+    def _user_id_exists(self, user_id: str) -> bool:
+        return any(item.user_id == user_id for item in self.users)
+
     def _get_active_borrow_count(self, user_id: str) -> int:
         return sum(
             1 for item in self.records if item.user_id == user_id and not item.returned
@@ -153,6 +159,63 @@ class LibraryService:
             return False, "该用户已经借阅过这本书且尚未归还。"
         return True, ""
 
+    def _touch_record_overdue_days(self, record: BorrowRecord) -> BorrowRecord:
+        if not record.returned:
+            record.overdue_days = record.calculate_overdue_days()
+        return record
+
+    def _matches_book_keyword(self, book: Book, keyword: str, field_name: str) -> bool:
+        book_fields = {
+            "title": safe_lower(book.title),
+            "author": safe_lower(book.author),
+            "isbn": safe_lower(book.isbn),
+        }
+        if field_name == "all":
+            return any(keyword in value for value in book_fields.values())
+        return keyword in book_fields.get(field_name, "")
+
+    def _matches_user_keyword(self, user: User, keyword: str) -> bool:
+        return any(
+            keyword in safe_lower(value)
+            for value in [
+                user.user_id,
+                user.name,
+                user.phone,
+                user.email,
+                user.user_type,
+            ]
+        )
+
+    def _count_users_by_type(self) -> dict[str, int]:
+        counts = {
+            "普通用户数": 0,
+            "教师用户数": 0,
+            "管理员数": 0,
+        }
+        for user in self.users:
+            if user.user_type == "管理员":
+                counts["管理员数"] += 1
+            elif user.user_type == "教师用户":
+                counts["教师用户数"] += 1
+            else:
+                counts["普通用户数"] += 1
+        return counts
+
+    def _count_record_statistics(self) -> tuple[int, int]:
+        borrowed_count = 0
+        overdue_count = 0
+        for record in self.records:
+            if not record.returned:
+                borrowed_count += 1
+                if record.calculate_overdue_days() > 0:
+                    overdue_count += 1
+        return borrowed_count, overdue_count
+
+    def _count_stock_statistics(self) -> tuple[int, int]:
+        total_stock = sum(book.total_count for book in self.books)
+        available_stock = sum(book.available_count for book in self.books)
+        return total_stock, available_stock
+
     def _apply_book_updates(self, book: Book, info: dict[str, Any]) -> tuple[bool, str]:
         if "title" in info and str(info["title"]).strip():
             book.title = str(info["title"]).strip()
@@ -215,9 +278,8 @@ class LibraryService:
 
         if not title or not author or not isbn:
             return False, "书名、作者、ISBN 不能为空。"
-        for item in self.books:
-            if item.book_id == book_id:
-                return False, "图书编号已存在。"
+        if self._book_id_exists(book_id):
+            return False, "图书编号已存在。"
         if self._book_exists(isbn):
             return False, "ISBN 已存在，本版本只做简单限制。"
 
@@ -262,23 +324,12 @@ class LibraryService:
     def search_books(self, keyword: str = "", field_name: str = "all") -> list[Book]:
         if not keyword:
             return list(self.books)
-        temp = safe_lower(keyword)
-        result = []
-        for item in self.books:
-            if field_name == "title" and temp in safe_lower(item.title):
-                result.append(item)
-            elif field_name == "author" and temp in safe_lower(item.author):
-                result.append(item)
-            elif field_name == "isbn" and temp in safe_lower(item.isbn):
-                result.append(item)
-            elif field_name == "all":
-                if (
-                    temp in safe_lower(item.title)
-                    or temp in safe_lower(item.author)
-                    or temp in safe_lower(item.isbn)
-                ):
-                    result.append(item)
-        return result
+        normalized_keyword = safe_lower(keyword)
+        return [
+            book
+            for book in self.books
+            if self._matches_book_keyword(book, normalized_keyword, field_name)
+        ]
 
     def list_books(self) -> list[Book]:
         return list(self.books)
@@ -292,9 +343,8 @@ class LibraryService:
 
         if not name:
             return False, "用户名不能为空。"
-        for item in self.users:
-            if item.user_id == user_id:
-                return False, "用户编号已存在。"
+        if self._user_id_exists(user_id):
+            return False, "用户编号已存在。"
         if phone and self._phone_exists(phone):
             return False, "手机号已存在，本版本只做简单处理。"
 
@@ -336,18 +386,12 @@ class LibraryService:
     def search_users(self, keyword: str = "") -> list[User]:
         if not keyword:
             return list(self.users)
-        temp = safe_lower(keyword)
-        result = []
-        for item in self.users:
-            if (
-                temp in safe_lower(item.user_id)
-                or temp in safe_lower(item.name)
-                or temp in safe_lower(item.phone)
-                or temp in safe_lower(item.email)
-                or temp in safe_lower(item.user_type)
-            ):
-                result.append(item)
-        return result
+        normalized_keyword = safe_lower(keyword)
+        return [
+            user
+            for user in self.users
+            if self._matches_user_keyword(user, normalized_keyword)
+        ]
 
     def list_users(self) -> list[User]:
         return list(self.users)
@@ -393,33 +437,25 @@ class LibraryService:
         return True, "还书成功，未逾期。"
 
     def get_user_records(self, user_id: str) -> list[BorrowRecord]:
-        result = []
-        for item in self.records:
-            if item.user_id == user_id:
-                if not item.returned:
-                    item.overdue_days = item.calculate_overdue_days()
-                result.append(item)
-        return result
+        return [
+            self._touch_record_overdue_days(record)
+            for record in self.records
+            if record.user_id == user_id
+        ]
 
     def get_unreturned_records(self) -> list[BorrowRecord]:
-        result = []
-        for item in self.records:
-            if not item.returned:
-                item.overdue_days = item.calculate_overdue_days()
-                result.append(item)
-        return result
+        return [
+            self._touch_record_overdue_days(record)
+            for record in self.records
+            if not record.returned
+        ]
 
     def get_overdue_records(self) -> list[BorrowRecord]:
         result = []
         for item in self.records:
-            if item.returned:
-                if item.overdue_days > 0:
-                    result.append(item)
-            else:
-                days = item.calculate_overdue_days()
-                item.overdue_days = days
-                if days > 0:
-                    result.append(item)
+            self._touch_record_overdue_days(item)
+            if item.overdue_days > 0:
+                result.append(item)
         self.storage.save_records(self.records)
         return result
 
@@ -431,39 +467,19 @@ class LibraryService:
 
     def get_statistics(self) -> dict[str, Any]:
         total_books = len(self.books)
-        total_stock = 0
-        available_stock = 0
-        borrowed_count = 0
-        overdue_count = 0
         user_count = len(self.users)
-        admin_count = 0
-        teacher_count = 0
-        normal_count = 0
-
-        for book in self.books:
-            total_stock += book.total_count
-            available_stock += book.available_count
-        for record in self.records:
-            if not record.returned:
-                borrowed_count += 1
-                if record.calculate_overdue_days() > 0:
-                    overdue_count += 1
-        for user in self.users:
-            if user.user_type == "管理员":
-                admin_count += 1
-            elif user.user_type == "教师用户":
-                teacher_count += 1
-            else:
-                normal_count += 1
+        total_stock, available_stock = self._count_stock_statistics()
+        borrowed_count, overdue_count = self._count_record_statistics()
+        user_type_counts = self._count_users_by_type()
 
         return {
             "图书种类数": total_books,
             "图书总库存": total_stock,
             "当前可借库存": available_stock,
             "用户总数": user_count,
-            "普通用户数": normal_count,
-            "教师用户数": teacher_count,
-            "管理员数": admin_count,
+            "普通用户数": user_type_counts["普通用户数"],
+            "教师用户数": user_type_counts["教师用户数"],
+            "管理员数": user_type_counts["管理员数"],
             "当前未归还数量": borrowed_count,
             "当前逾期数量": overdue_count,
             "默认借阅天数": self.default_borrow_days,

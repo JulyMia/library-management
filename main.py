@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from services import LibraryService
 from utils import (
     confirm,
@@ -18,6 +20,25 @@ from utils import (
 class LibraryCLI:
     def __init__(self) -> None:
         self.service = LibraryService()
+
+    def _run_menu_loop(
+        self,
+        title: str,
+        options: list[str],
+        handlers: dict[str, Callable[[], None]],
+        exit_choice: str,
+    ) -> None:
+        while True:
+            show_menu(title, options)
+            choice = input("请选择功能编号: ").strip()
+            if choice == exit_choice:
+                return
+            handler = handlers.get(choice)
+            if handler is None:
+                print("输入有误，请重新选择。")
+                pause()
+                continue
+            handler()
 
     def _pause_with_message(self, message: str) -> None:
         print(message)
@@ -159,10 +180,8 @@ class LibraryCLI:
         user_id = input_text("请输入用户编号: ")
         book_id = input_text("请输入图书编号: ")
         note = input_text("备注(可空): ", allow_empty=True)
-        ok, message = self.service.borrow_book(user_id, book_id, note)
+        _, message = self.service.borrow_book(user_id, book_id, note)
         print(message)
-        if not ok:
-            print("提示: 该版本中用户校验、库存校验、重复借阅校验都放在一个函数里，便于后续重构。")
         pause()
 
     def _handle_return_book(self) -> None:
@@ -190,7 +209,36 @@ class LibraryCLI:
         _, message = self.service.set_default_borrow_days(days)
         self._pause_with_message(message)
 
+    def _handle_show_overdue_records(self) -> None:
+        data = self.service.get_overdue_records()
+        if not data:
+            print("当前没有逾期记录。")
+        else:
+            print_record_rows(self.service.export_records_as_dicts(data))
+            print_line()
+            for item in data:
+                state = "已归还后逾期" if item.returned else "仍未归还且逾期"
+                print(
+                    f"记录号:{item.record_id} 用户:{item.user_name} 图书:{item.book_title} "
+                    f"逾期天数:{item.overdue_days} 状态:{state}"
+                )
+        pause()
+
+    def _handle_show_overdue_help(self) -> None:
+        print("系统默认借阅天数可在借阅管理菜单中设置。")
+        print("逾期判断方式较简单: 当前日期或归还日期晚于到期日期即视为逾期。")
+        print("该版本未实现罚款规则、节假日顺延等复杂业务。")
+        pause()
+
     def run(self) -> None:
+        main_handlers = {
+            "1": self.book_menu,
+            "2": self.user_menu,
+            "3": self.borrow_menu,
+            "4": self.overdue_menu,
+            "5": self.show_stats,
+            "6": self.load_sample_data,
+        }
         while True:
             show_menu(
                 "图书馆管理系统",
@@ -205,54 +253,36 @@ class LibraryCLI:
                 ],
             )
             choice = input("请选择功能编号: ").strip()
-            if choice == "1":
-                self.book_menu()
-            elif choice == "2":
-                self.user_menu()
-            elif choice == "3":
-                self.borrow_menu()
-            elif choice == "4":
-                self.overdue_menu()
-            elif choice == "5":
-                self.show_stats()
-            elif choice == "6":
-                self.load_sample_data()
-            elif choice == "7":
+            if choice == "7":
                 print("系统已退出。")
                 break
-            else:
+            handler = main_handlers.get(choice)
+            if handler is None:
                 print("输入有误，请重新选择。")
                 pause()
+                continue
+            handler()
 
     def book_menu(self) -> None:
-        while True:
-            show_menu(
-                "图书管理",
-                [
-                    "添加图书",
-                    "删除图书",
-                    "修改图书信息",
-                    "查询图书",
-                    "显示全部图书",
-                    "返回主菜单",
-                ],
-            )
-            choice = input("请选择功能编号: ").strip()
-            if choice == "1":
-                self._handle_add_book()
-            elif choice == "2":
-                self._handle_delete_book()
-            elif choice == "3":
-                self._handle_update_book()
-            elif choice == "4":
-                self.search_books_menu()
-            elif choice == "5":
-                self._handle_show_books()
-            elif choice == "6":
-                break
-            else:
-                print("输入有误，请重新选择。")
-                pause()
+        self._run_menu_loop(
+            "图书管理",
+            [
+                "添加图书",
+                "删除图书",
+                "修改图书信息",
+                "查询图书",
+                "显示全部图书",
+                "返回主菜单",
+            ],
+            {
+                "1": self._handle_add_book,
+                "2": self._handle_delete_book,
+                "3": self._handle_update_book,
+                "4": self.search_books_menu,
+                "5": self._handle_show_books,
+            },
+            "6",
+        )
 
     def search_books_menu(self) -> None:
         show_menu(
@@ -278,100 +308,61 @@ class LibraryCLI:
         pause()
 
     def user_menu(self) -> None:
-        while True:
-            show_menu(
-                "用户管理",
-                [
-                    "添加用户",
-                    "删除用户",
-                    "修改用户信息",
-                    "查询用户",
-                    "显示全部用户",
-                    "返回主菜单",
-                ],
-            )
-            choice = input("请选择功能编号: ").strip()
-            if choice == "1":
-                self._handle_add_user()
-            elif choice == "2":
-                self._handle_delete_user()
-            elif choice == "3":
-                self._handle_update_user()
-            elif choice == "4":
-                self._handle_search_user()
-            elif choice == "5":
-                self._handle_show_users()
-            elif choice == "6":
-                break
-            else:
-                print("输入有误，请重新选择。")
-                pause()
+        self._run_menu_loop(
+            "用户管理",
+            [
+                "添加用户",
+                "删除用户",
+                "修改用户信息",
+                "查询用户",
+                "显示全部用户",
+                "返回主菜单",
+            ],
+            {
+                "1": self._handle_add_user,
+                "2": self._handle_delete_user,
+                "3": self._handle_update_user,
+                "4": self._handle_search_user,
+                "5": self._handle_show_users,
+            },
+            "6",
+        )
 
     def borrow_menu(self) -> None:
-        while True:
-            show_menu(
-                "借阅管理",
-                [
-                    "用户借书",
-                    "用户还书",
-                    "查询某个用户的借阅记录",
-                    "查询所有未归还记录",
-                    "设置默认借阅天数",
-                    "返回主菜单",
-                ],
-            )
-            choice = input("请选择功能编号: ").strip()
-            if choice == "1":
-                self._handle_borrow_book()
-            elif choice == "2":
-                self._handle_return_book()
-            elif choice == "3":
-                self._handle_user_records()
-            elif choice == "4":
-                self._handle_show_unreturned_records()
-            elif choice == "5":
-                self._handle_set_borrow_days()
-            elif choice == "6":
-                break
-            else:
-                print("输入有误，请重新选择。")
-                pause()
+        self._run_menu_loop(
+            "借阅管理",
+            [
+                "用户借书",
+                "用户还书",
+                "查询某个用户的借阅记录",
+                "查询所有未归还记录",
+                "设置默认借阅天数",
+                "返回主菜单",
+            ],
+            {
+                "1": self._handle_borrow_book,
+                "2": self._handle_return_book,
+                "3": self._handle_user_records,
+                "4": self._handle_show_unreturned_records,
+                "5": self._handle_set_borrow_days,
+            },
+            "6",
+        )
 
     def overdue_menu(self) -> None:
-        while True:
-            show_menu(
-                "逾期管理",
-                [
-                    "查看当前逾期记录",
-                    "查看逾期详情说明",
-                    "返回主菜单",
-                ],
-            )
-            choice = input("请选择功能编号: ").strip()
-            if choice == "1":
-                data = self.service.get_overdue_records()
-                if not data:
-                    print("当前没有逾期记录。")
-                else:
-                    print_record_rows(self.service.export_records_as_dicts(data))
-                    print_line()
-                    for item in data:
-                        state = "已归还后逾期" if item.returned else "仍未归还且逾期"
-                        print(
-                            f"记录号:{item.record_id} 用户:{item.user_name} 图书:{item.book_title} "
-                            f"逾期天数:{item.overdue_days} 状态:{state}"
-                        )
-                pause()
-            elif choice == "2":
-                print("系统默认借阅天数可在借阅管理菜单中设置。")
-                print("逾期判断方式较简单: 当前日期或归还日期晚于到期日期即视为逾期。")
-                print("该版本未实现罚款规则、节假日顺延等复杂业务。")
-                pause()
-            elif choice == "3":
-                break
-            else:
-                print("输入有误，请重新选择。")
-                pause()
+        self._run_menu_loop(
+            "逾期管理",
+            [
+                "查看当前逾期记录",
+                "查看逾期详情说明",
+                "返回主菜单",
+            ],
+            {
+                "1": self._handle_show_overdue_records,
+                "2": self._handle_show_overdue_help,
+            },
+            "3",
+        )
 
     def show_stats(self) -> None:
         print_title("统计信息")
