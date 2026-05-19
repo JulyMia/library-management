@@ -282,7 +282,12 @@ class LibraryService:  # pylint: disable=too-many-public-methods
         author = str(info.get("author", "")).strip()
         isbn = str(info.get("isbn", "")).strip()
         total_count = int(info.get("total_count", 0) or 0)
-        available_count = int(info.get("available_count", total_count) or total_count)
+        raw_available_count = info.get("available_count", total_count)
+        available_count = (
+            total_count
+            if raw_available_count in (None, "")
+            else int(raw_available_count)
+        )
 
         if not title or not author or not isbn:
             return False, "书名、作者、ISBN 不能为空。"
